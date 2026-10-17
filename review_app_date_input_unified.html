@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f6f7fb">
+  <title>復習管理</title>
+  <style>
+    :root { color-scheme: light; --bg:#f6f7fb; --surface:#fff; --surface-soft:#f8fafc; --text:#182230; --muted:#667085; --border:#d9dee8; --accent:#3157c8; --danger:#c23636; --radius:14px; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif; line-height:1.5; -webkit-text-size-adjust:100%; }
+    main { width:min(100%, 900px); margin:0 auto; padding:clamp(14px, 3vw, 28px); padding-bottom:calc(24px + env(safe-area-inset-bottom)); }
+    header { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:22px; }
+    h1 { margin:0; font-size:1.35rem; letter-spacing:.02em; }
+    #today-label { margin:3px 0 0; color:var(--muted); font-size:.86rem; }
+    .header-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+    button, input, select { font:inherit; }
+    button { min-height:42px; padding:9px 13px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--text); cursor:pointer; -webkit-tap-highlight-color:transparent; }
+    button.primary { color:white; border-color:var(--accent); background:var(--accent); }
+    button.danger { color:var(--danger); }
+    button:active { transform:translateY(1px); }
+    .panel, .section { margin-bottom:22px; }
+    .panel { padding:16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:0 2px 8px rgba(16,24,40,.03); }
+    .panel h2, .section h2 { margin:0 0 12px; font-size:1rem; }
+    .section-title { color:var(--muted); }
+    .field-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .field { min-width:0; }
+    label { display:block; margin-bottom:5px; font-size:.84rem; color:var(--muted); }
+    input, select { display:block; width:100%; min-height:44px; padding:9px 11px; border:1px solid var(--border); border-radius:10px; background:#fff; color:var(--text); }
+    input:focus, select:focus, button:focus-visible { outline:2px solid #9bb0ff; outline-offset:1px; }
+    .field-help { margin:6px 0 0; color:var(--muted); font-size:.8rem; }
+    .form-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; margin-top:16px; }
+    .book-row, .problem-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; margin-bottom:8px; border:1px solid var(--border); border-radius:12px; background:var(--surface); }
+    .problem-main { min-width:0; flex:1; }
+    .problem-name { margin:0; overflow-wrap:anywhere; font-weight:600; font-size:.92rem; }
+    .problem-page { margin:3px 0 0; color:var(--muted); font-size:.84rem; overflow-wrap:anywhere; }
+    .problem-tools { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+    .due-date { color:var(--muted); font-size:.82rem; white-space:nowrap; }
+    .due-date.overdue { color:var(--danger); }
+    .date-edit { width:auto; min-width:145px; max-width:100%; min-height:40px; padding:6px 8px; font-size:.86rem; }
+    .empty { margin:0; color:var(--muted); font-size:.9rem; }
+    .subject-heading { margin:18px 0 6px; font-size:1rem; font-weight:700; }
+    .book-heading { margin:0 0 8px 4px; color:var(--muted); font-size:.84rem; }
+    .hidden { display:none !important; }
+    .subtle { background:var(--surface-soft); }
+    .date-input-wrap { position:relative; display:flex; align-items:center; }
+    .date-input-wrap input[type="text"] { padding-right:52px; }
+    .calendar-btn { position:absolute; right:4px; min-height:36px; width:40px; padding:4px; border:0; background:transparent; }
+    .native-date-picker { position:absolute; right:4px; top:4px; width:40px; height:36px; opacity:0; pointer-events:none; }
+    .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+    @media (max-width:600px) {
+      main { padding:14px; }
+      header { align-items:flex-start; flex-direction:column; }
+      .header-actions { width:100%; display:grid; grid-template-columns:1fr 1fr; }
+      .header-actions button { width:100%; padding-inline:7px; font-size:.9rem; }
+      .panel { padding:13px; }
+      .field-grid { grid-template-columns:minmax(0,1fr); gap:11px; }
+      .problem-row { align-items:stretch; flex-direction:column; gap:10px; }
+      .problem-tools { width:100%; justify-content:flex-start; }
+      .date-edit { flex:1; min-width:140px; }
+      .due-date { min-width:fit-content; }
+      .book-row { align-items:flex-start; }
+      .form-actions button { flex:1; }
+    }
+  </style>
+</head>
+<body>
+<main id="app">
+  <h2 class="sr-only">参考書と復習問題を管理するアプリ</h2>
+  <header>
+    <div>
+      <h1>復習管理</h1>
+      <p id="today-label"></p>
+    </div>
+    <div class="header-actions">
+      <button id="book-manage-btn">📚 参考書を管理</button>
+      <button id="add-open-btn" class="primary">＋ 問題を登録</button>
+    </div>
+  </header>
+
+  <section id="book-panel" class="panel hidden">
+    <h2>参考書一覧</h2>
+    <div id="book-list-view" class="subtle" style="padding:10px;border-radius:10px;margin-bottom:14px"></div>
+    <div class="field-grid">
+      <div class="field"><label for="book-in-subject">科目</label><input type="text" id="book-in-subject" placeholder="例：数学" list="subject-list"><datalist id="subject-list"></datalist></div>
+      <div class="field"><label for="book-in-name">参考書名</label><input type="text" id="book-in-name" placeholder="例：青チャート"></div>
+    </div>
+    <div class="form-actions"><button id="book-add-btn" class="primary">参考書を追加</button><button id="book-panel-close-btn">閉じる</button></div>
+  </section>
+
+  <section id="add-form" class="panel hidden">
+    <h2>問題を登録</h2>
+    <div class="field" style="margin-bottom:12px">
+      <label for="in-book-select">参考書</label>
+      <select id="in-book-select"></select>
+      <p class="field-help" id="no-book-hint"></p>
+    </div>
+    <div id="custom-book-fields" class="field-grid hidden" style="margin-bottom:12px">
+      <div class="field"><label for="in-subject">科目</label><input type="text" id="in-subject" placeholder="例：数学" list="subject-list"></div>
+      <div class="field"><label for="in-book">参考書名</label><input type="text" id="in-book" placeholder="例：青チャート" list="book-name-list"><datalist id="book-name-list"></datalist></div>
+    </div>
+    <div class="field-grid">
+      <div class="field"><label for="in-page">ページ / 問題番号</label><input type="text" id="in-page" placeholder="例：p.42 問3"></div>
+      <div class="field">
+        <label for="in-date">復習したい日</label>
+        <div class="date-input-wrap">
+          <input type="text" id="in-date" inputmode="numeric" placeholder="YYYY-MM-DD" autocomplete="off" aria-describedby="date-help">
+          <button type="button" id="date-calendar-btn" class="calendar-btn" aria-label="カレンダーを開く" title="カレンダーを開く">📅</button>
+          <input type="date" id="in-date-picker" class="native-date-picker" aria-label="カレンダーで復習日を選択" tabindex="-1">
+        </div>
+        <p class="field-help" id="date-help">日付を直接入力するか、📅を押してカレンダーから選択できます。</p>
+      </div>
+    </div>
+    <div class="form-actions"><button id="add-cancel-btn">キャンセル</button><button id="add-save-btn" class="primary">登録する</button></div>
+  </section>
+
+  <section class="section">
+    <h2 class="section-title">今日復習する問題</h2>
+    <div id="today-list"></div>
+  </section>
+  <section class="section">
+    <h2 class="section-title">登録済みの問題（科目・参考書別）</h2>
+    <div id="all-list"></div>
+  </section>
+  <p class="field-help">データは、このブラウザ内に保存されます。別の端末やブラウザとは自動で同期されません。</p>
+</main>
+<script>
+(() => {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const STORAGE_PROBLEMS = 'review_manager_problems_v1';
+  const STORAGE_BOOKS = 'review_manager_books_v1';
+  const todayStr = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  };
+  const makeId = () => (Date.now().toString(36) + Math.random().toString(36).slice(2,8));
+  let problems = [];
+  let books = [];
+
+  function readStored(key) {
+    try {
+      const value = localStorage.getItem(key);
+      const parsed = value ? JSON.parse(value) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (err) { return []; }
+  }
+  function saveStored(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch (err) {
+      alert('データを保存できませんでした。ブラウザの保存設定を確認してください。');
+      return false;
+    }
+  }
+  const saveProblems = () => saveStored(STORAGE_PROBLEMS, problems);
+  const saveBooks = () => saveStored(STORAGE_BOOKS, books);
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function normalizeDateInput(value) {
+    const raw = String(value || '').trim().replace(/[./]/g, '-');
+    const m = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (!m) return null;
+    const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+    const dt = new Date(y, mo - 1, d);
+    if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+    return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  }
+  function showPanel(which) {
+    $('book-panel').classList.toggle('hidden', which !== 'books');
+    $('add-form').classList.toggle('hidden', which !== 'add');
+  }
+  function renderBookSelect() {
+    const sel = $('in-book-select');
+    const previous = sel.value;
+    const registered = books.slice().sort((a,b) => (a.subject+a.name).localeCompare(b.subject+b.name, 'ja'))
+      .map(b => `<option value="${escapeHtml(b.id)}">${escapeHtml(b.subject)} - ${escapeHtml(b.name)}</option>`).join('');
+    sel.innerHTML = registered + '<option value="__custom__">＋ 自由に入力する</option>';
+    if (previous && (books.some(b => b.id === previous) || previous === '__custom__')) sel.value = previous;
+    else sel.value = books.length ? books.slice().sort((a,b) => (a.subject+a.name).localeCompare(b.subject+b.name, 'ja'))[0].id : '__custom__';
+    $('no-book-hint').textContent = books.length === 0 ? '参考書を先に登録するか、「自由に入力する」を選んでください。' : '';
+    toggleCustomFields();
+  }
+  function toggleCustomFields() {
+    $('custom-book-fields').classList.toggle('hidden', $('in-book-select').value !== '__custom__');
+  }
+  function renderBookListView() {
+    const view = $('book-list-view');
+    if (books.length === 0) {
+      view.innerHTML = '<p class="empty">まだ参考書が登録されていません。</p>';
+      return;
+    }
+    view.innerHTML = books.slice().sort((a,b) => (a.subject+a.name).localeCompare(b.subject+b.name, 'ja')).map(b => `
+      <div class="book-row"><span>${escapeHtml(b.subject)} - ${escapeHtml(b.name)}</span><button class="danger book-del-btn" data-id="${escapeHtml(b.id)}" aria-label="${escapeHtml(b.name)}を削除">削除</button></div>`).join('');
+    view.querySelectorAll('.book-del-btn').forEach(btn => btn.addEventListener('click', () => {
+      const target = books.find(b => b.id === btn.dataset.id);
+      if (!target || !confirm(`「${target.subject} - ${target.name}」を参考書一覧から削除しますか？\n登録済みの問題は削除されません。`)) return;
+      books = books.filter(b => b.id !== btn.dataset.id);
+      if (saveBooks()) { renderBookListView(); renderBookSelect(); renderDatalists(); }
+    }));
+  }
+  function problemRowHtml(p) {
+    const due = p.nextReviewDate || todayStr();
+    const overdue = due < todayStr();
+    return `<div class="problem-row">
+      <div class="problem-main"><p class="problem-name">${escapeHtml(p.subject)} / ${escapeHtml(p.book)}</p>${p.page ? `<p class="problem-page">${escapeHtml(p.page)}</p>` : ''}</div>
+      <div class="problem-tools"><span class="due-date ${overdue ? 'overdue' : ''}">${escapeHtml(due)}</span><input type="date" value="${escapeHtml(due)}" data-id="${escapeHtml(p.id)}" class="date-edit" aria-label="復習日を変更"><button data-id="${escapeHtml(p.id)}" class="danger del-btn">削除</button></div>
+    </div>`;
+  }
+  function renderDatalists() {
+    const subjects = [...new Set([...books.map(b=>b.subject), ...problems.map(p=>p.subject)].filter(Boolean))];
+    const names = [...new Set([...books.map(b=>b.name), ...problems.map(p=>p.book)].filter(Boolean))];
+    $('subject-list').innerHTML = subjects.map(s => `<option value="${escapeHtml(s)}"></option>`).join('');
+    $('book-name-list').innerHTML = names.map(s => `<option value="${escapeHtml(s)}"></option>`).join('');
+  }
+  function render() {
+    renderDatalists();
+    renderBookSelect();
+    renderBookListView();
+    const today = todayStr();
+    const todays = problems.filter(p => (p.nextReviewDate || '') <= today).sort((a,b) => (a.nextReviewDate || '').localeCompare(b.nextReviewDate || ''));
+    $('today-list').innerHTML = todays.length ? todays.map(problemRowHtml).join('') : '<p class="empty">今日復習する問題はありません。</p>';
+    if (!problems.length) {
+      $('all-list').innerHTML = '<p class="empty">まだ問題が登録されていません。</p>';
+    } else {
+      const grouped = {};
+      problems.forEach(p => {
+        const subject = p.subject || '（科目未設定）';
+        const book = p.book || '（参考書名未設定）';
+        grouped[subject] ||= {};
+        grouped[subject][book] ||= [];
+        grouped[subject][book].push(p);
+      });
+      let html = '';
+      Object.keys(grouped).sort((a,b)=>a.localeCompare(b,'ja')).forEach(subject => {
+        html += `<h3 class="subject-heading">${escapeHtml(subject)}</h3>`;
+        Object.keys(grouped[subject]).sort((a,b)=>a.localeCompare(b,'ja')).forEach(book => {
+          html += `<p class="book-heading">${escapeHtml(book)}</p>`;
+          html += grouped[subject][book].sort((a,b)=>(a.nextReviewDate||'').localeCompare(b.nextReviewDate||'')).map(problemRowHtml).join('');
+        });
+      });
+      $('all-list').innerHTML = html;
+    }
+    document.querySelectorAll('.del-btn').forEach(btn => btn.addEventListener('click', () => {
+      const p = problems.find(p => p.id === btn.dataset.id);
+      if (!p || !confirm('この問題を削除しますか？')) return;
+      problems = problems.filter(p => p.id !== btn.dataset.id);
+      if (saveProblems()) render();
+    }));
+    document.querySelectorAll('.date-edit').forEach(inp => inp.addEventListener('change', () => {
+      const p = problems.find(p => p.id === inp.dataset.id);
+      if (!p || !inp.value) return;
+      p.nextReviewDate = inp.value;
+      if (saveProblems()) render();
+    }));
+  }
+
+  $('today-label').textContent = `今日：${todayStr()}`;
+  problems = readStored(STORAGE_PROBLEMS);
+  books = readStored(STORAGE_BOOKS);
+  render();
+
+  $('book-manage-btn').addEventListener('click', () => { showPanel('books'); renderBookListView(); });
+  $('book-panel-close-btn').addEventListener('click', () => showPanel(null));
+  $('add-open-btn').addEventListener('click', () => {
+    showPanel('add');
+    $('in-date').value = todayStr();
+    $('in-date-picker').value = todayStr();
+    renderBookSelect();
+  });
+  $('add-cancel-btn').addEventListener('click', () => showPanel(null));
+  $('in-book-select').addEventListener('change', toggleCustomFields);
+  $('date-calendar-btn').addEventListener('click', () => {
+    const picker = $('in-date-picker');
+    if (typeof picker.showPicker === 'function') {
+      try { picker.showPicker(); return; } catch (err) {}
+    }
+    picker.style.pointerEvents = 'auto';
+    picker.style.opacity = '0.01';
+    picker.click();
+    picker.style.pointerEvents = 'none';
+    picker.style.opacity = '0';
+  });
+  $('in-date-picker').addEventListener('change', () => {
+    if ($('in-date-picker').value) $('in-date').value = $('in-date-picker').value;
+  });
+  $('in-date').addEventListener('input', () => {
+    const normalized = normalizeDateInput($('in-date').value);
+    if (normalized) $('in-date-picker').value = normalized;
+  });
+  $('in-date').addEventListener('change', () => {
+    const normalized = normalizeDateInput($('in-date').value);
+    if (normalized) {
+      $('in-date').value = normalized;
+      $('in-date-picker').value = normalized;
+    }
+  });
+  $('book-add-btn').addEventListener('click', () => {
+    const subject = $('book-in-subject').value.trim();
+    const name = $('book-in-name').value.trim();
+    if (!subject || !name) { alert('科目と参考書名を入力してください。'); return; }
+    books.push({ id: makeId(), subject, name });
+    if (saveBooks()) {
+      $('book-in-subject').value = '';
+      $('book-in-name').value = '';
+      renderBookListView(); renderBookSelect(); renderDatalists();
+    } else books.pop();
+  });
+  $('add-save-btn').addEventListener('click', () => {
+    const bookId = $('in-book-select').value;
+    const page = $('in-page').value.trim();
+    let subject, book;
+    if (bookId === '__custom__') {
+      subject = $('in-subject').value.trim();
+      book = $('in-book').value.trim();
+      if (!subject || !book) { alert('科目と参考書名を入力してください。'); return; }
+    } else {
+      const found = books.find(b => b.id === bookId);
+      if (!found) { alert('参考書を選択するか、「＋ 自由に入力する」を選んでください。'); return; }
+      subject = found.subject; book = found.name;
+    }
+    const normalizedDate = normalizeDateInput($('in-date').value);
+    if (!normalizedDate) { alert('復習日は「2026-10-20」のように入力するか、カレンダーから選んでください。'); return; }
+    const newProblem = { id: makeId(), subject, book, page, nextReviewDate: normalizedDate };
+    problems.push(newProblem);
+    if (!saveProblems()) { problems.pop(); return; }
+    $('in-page').value = '';
+    $('in-subject').value = '';
+    $('in-book').value = '';
+    showPanel(null);
+    render();
+  });
+})();
+</script>
+</body>
+</html>
