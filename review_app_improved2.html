@@ -1,0 +1,908 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f6f7fb">
+  <title>復習管理</title>
+  <style>
+    :root { color-scheme: light; --bg:#f6f7fb; --surface:#fff; --surface-soft:#f8fafc; --text:#182230; --muted:#667085; --border:#d9dee8; --accent:#3157c8; --danger:#c23636; --radius:14px; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif; line-height:1.5; -webkit-text-size-adjust:100%; }
+    main { width:min(100%, 900px); margin:0 auto; padding:clamp(14px, 3vw, 28px); padding-bottom:calc(24px + env(safe-area-inset-bottom)); }
+    header { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:22px; }
+    h1 { margin:0; font-size:1.35rem; letter-spacing:.02em; }
+    #today-label { margin:3px 0 0; color:var(--muted); font-size:.86rem; }
+    .header-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+    button, input, select { font:inherit; }
+    button { min-height:42px; padding:9px 13px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--text); cursor:pointer; -webkit-tap-highlight-color:transparent; }
+    button.primary { color:white; border-color:var(--accent); background:var(--accent); }
+    button.danger { color:var(--danger); }
+    button:active { transform:translateY(1px); }
+    .panel, .section { margin-bottom:22px; }
+    .panel { padding:16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:0 2px 8px rgba(16,24,40,.03); }
+    .panel h2, .section h2 { margin:0 0 12px; font-size:1rem; }
+    .section-title { color:var(--muted); }
+    .field-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .field { min-width:0; }
+    label { display:block; margin-bottom:5px; font-size:.84rem; color:var(--muted); }
+    .label-opt { font-size:.76rem; color:var(--muted); font-weight:normal; margin-left:4px; }
+    input, select { display:block; width:100%; min-height:44px; padding:9px 11px; border:1px solid var(--border); border-radius:10px; background:#fff; color:var(--text); }
+    input:focus, select:focus, button:focus-visible { outline:2px solid #9bb0ff; outline-offset:1px; }
+    .field-help { margin:6px 0 0; color:var(--muted); font-size:.8rem; }
+    .form-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; margin-top:16px; }
+    .book-row, .problem-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; margin-bottom:8px; border:1px solid var(--border); border-radius:12px; background:var(--surface); }
+    .problem-main { min-width:0; flex:1; }
+    .problem-name { margin:0; overflow-wrap:anywhere; font-weight:600; font-size:.92rem; }
+    .problem-page { margin:3px 0 0; color:var(--muted); font-size:.84rem; overflow-wrap:anywhere; }
+    .review-info { margin-top:6px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:.8rem; color:var(--muted); }
+    .review-badge { background:var(--surface-soft); padding:2px 6px; border-radius:6px; border:1px solid var(--border); font-weight:600; color:var(--accent); }
+    .problem-tools { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+    .due-date { color:var(--muted); font-size:.82rem; white-space:nowrap; }
+    .due-date.overdue { color:var(--danger); }
+    .date-edit { width:auto; min-width:130px; max-width:100%; min-height:40px; padding:6px 8px; font-size:.86rem; }
+    .empty { margin:0; color:var(--muted); font-size:.9rem; }
+    .subject-heading { margin:18px 0 6px; font-size:1rem; font-weight:700; }
+    .book-heading { margin:0 0 8px 4px; color:var(--muted); font-size:.84rem; }
+    .hidden { display:none !important; }
+
+    /* ── 履歴（アーカイブ）セクション ── */
+    .archive-section { margin-bottom:22px; }
+    .archive-toggle-row { display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none; padding:8px 4px; border-radius:10px; -webkit-tap-highlight-color:transparent; }
+    .archive-toggle-row:hover { background:var(--surface-soft); }
+    .archive-toggle-title { font-size:.95rem; font-weight:700; color:var(--muted); flex:1; }
+    .archive-toggle-icon { font-size:.75rem; color:var(--muted); transition:transform .2s; }
+    .archive-section.open .archive-toggle-icon { transform:rotate(180deg); }
+    .archive-body { display:none; margin-top:8px; }
+    .archive-section.open .archive-body { display:block; }
+    /* アーカイブ済み問題行 */
+    .archived-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; margin-bottom:8px; border:1px solid var(--border); border-radius:12px; background:var(--surface-soft); opacity:.78; }
+    .archived-main { min-width:0; flex:1; }
+    .archived-name { margin:0; font-weight:600; font-size:.88rem; color:var(--muted); overflow-wrap:anywhere; }
+    .archived-meta { margin:3px 0 0; font-size:.8rem; color:var(--muted); }
+    .archived-tools { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .restore-btn { font-size:.84rem; min-height:36px; padding:6px 10px; border-radius:8px; color:var(--accent); border-color:var(--accent); }
+    @media (max-width:600px) {
+      .archived-row { flex-direction:column; align-items:stretch; }
+      .archived-tools { width:100%; }
+    }
+    .subtle { background:var(--surface-soft); }
+
+    /* ── 問題登録フォーム内カレンダー ── */
+    .date-input-wrap { position:relative; display:flex; align-items:center; }
+    .date-input-wrap input[type="text"] { padding-right:52px; }
+    .calendar-btn {
+      position:absolute; right:4px;
+      min-height:36px; width:40px; padding:4px;
+      border:0; background:transparent;
+      font-size:1.15rem;
+      display:flex; align-items:center; justify-content:center;
+      z-index:1;
+      pointer-events:none;
+    }
+    .native-date-picker {
+      position:absolute; right:4px; top:50%; transform:translateY(-50%);
+      width:40px; height:40px;
+      opacity:0; cursor:pointer;
+      z-index:2;
+      -webkit-appearance:none; appearance:none;
+      border:none; background:transparent; padding:0; margin:0;
+      display:block;
+    }
+
+    .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+
+    /* ── 参考書グループカード ── */
+    .book-group-card { border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); margin-bottom:12px; box-shadow:0 2px 6px rgba(16,24,40,.04); overflow:hidden; }
+    .book-group-header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; cursor:pointer; user-select:none; background:var(--surface-soft); gap:10px; -webkit-tap-highlight-color:transparent; }
+    .book-group-header:hover { background:#eef2fb; }
+    .book-group-title { font-weight:700; font-size:.95rem; flex:1; min-width:0; overflow-wrap:anywhere; }
+    .book-group-meta { color:var(--muted); font-size:.82rem; white-space:nowrap; }
+    .book-group-toggle { font-size:.75rem; color:var(--muted); transition:transform .2s; }
+    .book-group-card.open .book-group-toggle { transform:rotate(180deg); }
+    .book-group-body { display:none; padding:10px 12px 4px; }
+    .book-group-card.open .book-group-body { display:block; }
+    .book-group-body .problem-row { border-color:#e8ecf4; box-shadow:none; }
+
+    /* ══════════════════════════════════════
+       📅 カレンダービュー
+    ══════════════════════════════════════ */
+    #cal-panel { margin-bottom:22px; }
+    .cal-nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; gap:8px; }
+    .cal-nav-title { font-size:1.05rem; font-weight:700; text-align:center; flex:1; }
+    .cal-nav-btn { min-height:38px; padding:6px 14px; font-size:1rem; border-radius:10px; }
+    .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+    .cal-dow { text-align:center; font-size:.72rem; font-weight:600; color:var(--muted); padding:4px 0; }
+    .cal-dow:first-child { color:#e05858; }
+    .cal-dow:last-child { color:#3a82d9; }
+    .cal-cell {
+      position:relative; text-align:center;
+      padding:6px 2px 10px;
+      border-radius:10px;
+      cursor:pointer;
+      transition:background .15s;
+      min-height:46px;
+      -webkit-tap-highlight-color:transparent;
+      user-select:none;
+    }
+    .cal-cell:hover { background:#eef2fb; }
+    .cal-cell.empty { cursor:default; pointer-events:none; }
+    .cal-day-num {
+      font-size:.88rem;
+      font-weight:500;
+      display:block;
+      line-height:1;
+    }
+    .cal-cell.is-today .cal-day-num {
+      background:var(--accent);
+      color:#fff;
+      border-radius:50%;
+      width:26px; height:26px;
+      display:inline-flex; align-items:center; justify-content:center;
+    }
+    .cal-cell.is-selected { background:#dce6ff; }
+    .cal-cell.is-selected:hover { background:#c8d8ff; }
+    .cal-cell.sun .cal-day-num { color:#e05858; }
+    .cal-cell.sat .cal-day-num { color:#3a82d9; }
+    .cal-cell.other-month .cal-day-num { color:#c2c8d6; }
+    /* ドット列 */
+    .cal-dots {
+      position:absolute; bottom:3px; left:0; right:0;
+      display:flex; justify-content:center; gap:3px;
+    }
+    .cal-dot {
+      width:5px; height:5px; border-radius:50%;
+    }
+    .cal-dot.normal { background:var(--accent); }
+    .cal-dot.overdue { background:var(--danger); }
+
+    /* カレンダーの日付クリック後の問題リスト */
+    #cal-day-detail { margin-top:16px; border-top:1px solid var(--border); padding-top:14px; }
+    #cal-day-detail-title { margin:0 0 10px; font-size:.92rem; font-weight:700; color:var(--text); }
+
+    @media (max-width:600px) {
+      main { padding:14px; }
+      header { align-items:flex-start; flex-direction:column; }
+      .header-actions { width:100%; display:grid; grid-template-columns:1fr 1fr; }
+      .header-actions button { width:100%; padding-inline:7px; font-size:.9rem; }
+      .panel { padding:13px; }
+      .field-grid { grid-template-columns:minmax(0,1fr); gap:11px; }
+      .problem-row { align-items:stretch; flex-direction:column; gap:10px; }
+      .problem-tools { width:100%; justify-content:flex-start; }
+      .date-edit { flex:1; min-width:120px; }
+      .book-row { align-items:flex-start; }
+      .form-actions button { flex:1; }
+      .cal-cell { padding:4px 1px 9px; min-height:40px; }
+      .cal-day-num { font-size:.8rem; }
+    }
+  </style>
+</head>
+<body>
+<main id="app">
+  <h2 class="sr-only">参考書と復習問題を管理するアプリ</h2>
+  <header>
+    <div>
+      <h1>復習管理</h1>
+      <p id="today-label"></p>
+    </div>
+    <div class="header-actions">
+      <button id="cal-btn">📅 カレンダー</button>
+      <button id="book-manage-btn">📚 参考書を管理</button>
+      <button id="add-open-btn" class="primary">＋ 問題を登録</button>
+    </div>
+  </header>
+
+  <!-- ── カレンダーパネル ── -->
+  <section id="cal-panel" class="panel hidden">
+    <div class="cal-nav">
+      <button id="cal-prev" class="cal-nav-btn" aria-label="前の月">‹</button>
+      <span id="cal-title" class="cal-nav-title"></span>
+      <button id="cal-next" class="cal-nav-btn" aria-label="次の月">›</button>
+    </div>
+    <div class="cal-grid" id="cal-grid"></div>
+    <div id="cal-day-detail" class="hidden">
+      <p id="cal-day-detail-title"></p>
+      <div id="cal-day-list"></div>
+    </div>
+  </section>
+
+  <section id="book-panel" class="panel hidden">
+    <h2>参考書一覧</h2>
+    <div id="book-list-view" class="subtle" style="padding:10px;border-radius:10px;margin-bottom:14px"></div>
+    <div class="field-grid">
+      <div class="field">
+        <label for="book-in-subject">科目<span class="label-opt">（任意）</span></label>
+        <input type="text" id="book-in-subject" placeholder="例：数学（空欄でも可）" list="subject-list">
+        <datalist id="subject-list"></datalist>
+      </div>
+      <div class="field">
+        <label for="book-in-name">参考書名<span class="label-opt">（任意）</span></label>
+        <input type="text" id="book-in-name" placeholder="例：青チャート">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button id="book-add-btn" class="primary">参考書を追加</button>
+      <button id="book-panel-close-btn">閉じる</button>
+    </div>
+  </section>
+
+  <section id="add-form" class="panel hidden">
+    <h2>問題を登録</h2>
+    <div class="field" style="margin-bottom:12px">
+      <label for="in-book-select">参考書<span class="label-opt">（任意）</span></label>
+      <select id="in-book-select"></select>
+      <p class="field-help" id="no-book-hint"></p>
+    </div>
+    <div id="custom-book-fields" class="field-grid hidden" style="margin-bottom:12px">
+      <div class="field">
+        <label for="in-subject">科目<span class="label-opt">（任意）</span></label>
+        <input type="text" id="in-subject" placeholder="例：数学（空欄でも可）" list="subject-list">
+      </div>
+      <div class="field">
+        <label for="in-book">参考書名<span class="label-opt">（任意）</span></label>
+        <input type="text" id="in-book" placeholder="例：青チャート（空欄でも可）" list="book-name-list">
+        <datalist id="book-name-list"></datalist>
+      </div>
+    </div>
+    <div class="field-grid">
+      <div class="field">
+        <label for="in-page">ページ / 問題番号<span class="label-opt">（任意）</span></label>
+        <input type="text" id="in-page" placeholder="例：p.42 問3（空欄でも可）">
+      </div>
+      <div class="field">
+        <label for="in-date">復習したい日</label>
+        <div class="date-input-wrap">
+          <input type="text" id="in-date" inputmode="numeric" placeholder="YYYY-MM-DD" autocomplete="off" aria-describedby="date-help">
+          <input type="date" id="in-date-picker" class="native-date-picker" aria-label="カレンダーで復習日を選択">
+          <span class="calendar-btn" aria-hidden="true">📅</span>
+        </div>
+        <p class="field-help" id="date-help">日付を直接入力するか、📅を押してカレンダーから選択できます。</p>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button id="add-cancel-btn">キャンセル</button>
+      <button id="add-save-btn" class="primary">登録する</button>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="section-title">今日復習する問題</h2>
+    <div id="today-list"></div>
+  </section>
+  <section class="section">
+    <h2 class="section-title">登録済みの問題（科目・参考書別）</h2>
+    <div id="all-list"></div>
+  </section>
+
+  <!-- ── 履歴（アーカイブ）セクション ── -->
+  <div class="archive-section" id="archive-section">
+    <div class="archive-toggle-row" id="archive-toggle" role="button" tabindex="0" aria-expanded="false">
+      <span class="archive-toggle-title">📦 復習履歴（アーカイブ）</span>
+      <span id="archive-count-badge" style="font-size:.8rem;color:var(--muted);"></span>
+      <span class="archive-toggle-icon">▼</span>
+    </div>
+    <div class="archive-body" id="archive-body"></div>
+  </div>
+
+  <p class="field-help">データは、このブラウザ内に保存されます。別の端末やブラウザとは自動で同期されません。</p>
+</main>
+<script>
+(() => {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const STORAGE_PROBLEMS = 'review_manager_problems_v1';
+  const STORAGE_BOOKS = 'review_manager_books_v1';
+  const todayStr = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  };
+  const makeId = () => (Date.now().toString(36) + Math.random().toString(36).slice(2,8));
+  let problems = [];
+  let books = [];
+
+  // ── カレンダー状態 ──
+  let calYear = new Date().getFullYear();
+  let calMonth = new Date().getMonth(); // 0-indexed
+  let calSelectedDate = null;
+
+  function readStored(key) {
+    try {
+      const value = localStorage.getItem(key);
+      const parsed = value ? JSON.parse(value) : [];
+      if (Array.isArray(parsed) && key === STORAGE_PROBLEMS) {
+        parsed.forEach(p => {
+          if (!Array.isArray(p.history)) p.history = [];
+          if (p.archived === undefined) p.archived = false;
+        });
+      }
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (err) { return []; }
+  }
+  function saveStored(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch (err) {
+      alert('データを保存できませんでした。ブラウザの保存設定を確認してください。');
+      return false;
+    }
+  }
+  const saveProblems = () => saveStored(STORAGE_PROBLEMS, problems);
+  const saveBooks = () => saveStored(STORAGE_BOOKS, books);
+
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function normalizeDateInput(value) {
+    const raw = String(value || '').trim().replace(/[./]/g, '-');
+    const m = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (!m) return null;
+    const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+    const dt = new Date(y, mo - 1, d);
+    if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+    return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  }
+
+  function formatTitle(subject, book) {
+    const s = (subject || '').trim();
+    const b = (book || '').trim();
+    if (s && b) return `${s} / ${b}`;
+    if (b) return b;
+    if (s) return s;
+    return '問題（参考書未指定）';
+  }
+
+  function showPanel(which) {
+    $('book-panel').classList.toggle('hidden', which !== 'books');
+    $('add-form').classList.toggle('hidden', which !== 'add');
+    $('cal-panel').classList.toggle('hidden', which !== 'cal');
+  }
+
+  // ══════════════════════════════════════
+  //  📅 カレンダー描画
+  // ══════════════════════════════════════
+  function buildDateMap() {
+    // アーカイブ済みを除外して { 'YYYY-MM-DD': [problem, ...] } を構築
+    const map = {};
+    problems.filter(p => !p.archived).forEach(p => {
+      const d = p.nextReviewDate;
+      if (!d) return;
+      if (!map[d]) map[d] = [];
+      map[d].push(p);
+    });
+    return map;
+  }
+
+  function renderCalendar() {
+    const today = todayStr();
+    const dateMap = buildDateMap();
+
+    // タイトル
+    const monthNames = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+    $('cal-title').textContent = `${calYear}年 ${monthNames[calMonth]}`;
+
+    // 1日の曜日（0=日）
+    const firstDay = new Date(calYear, calMonth, 1).getDay();
+    // 月の最終日
+    const lastDate = new Date(calYear, calMonth + 1, 0).getDate();
+
+    const dowLabels = ['日','月','火','水','木','金','土'];
+    let html = dowLabels.map(d => `<div class="cal-dow">${d}</div>`).join('');
+
+    // 空白セル
+    for (let i = 0; i < firstDay; i++) {
+      html += `<div class="cal-cell empty"></div>`;
+    }
+
+    for (let day = 1; day <= lastDate; day++) {
+      const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+      const dayOfWeek = (firstDay + day - 1) % 7;
+      const isToday = dateStr === today;
+      const isSel = dateStr === calSelectedDate;
+      const isSun = dayOfWeek === 0;
+      const isSat = dayOfWeek === 6;
+
+      let classes = 'cal-cell';
+      if (isToday) classes += ' is-today';
+      if (isSel) classes += ' is-selected';
+      if (isSun) classes += ' sun';
+      if (isSat) classes += ' sat';
+
+      // ドット
+      let dotsHtml = '';
+      if (dateMap[dateStr] && dateMap[dateStr].length > 0) {
+        const hasOverdue = dateStr < today;
+        const dotCount = Math.min(dateMap[dateStr].length, 3);
+        dotsHtml = `<div class="cal-dots">`;
+        for (let k = 0; k < dotCount; k++) {
+          dotsHtml += `<span class="cal-dot ${hasOverdue ? 'overdue' : 'normal'}"></span>`;
+        }
+        if (dateMap[dateStr].length > 3) {
+          dotsHtml += `<span class="cal-dot normal"></span>`; // 省略表示
+        }
+        dotsHtml += `</div>`;
+      }
+
+      html += `<div class="${classes}" data-date="${dateStr}" role="button" tabindex="0" aria-label="${calYear}年${calMonth+1}月${day}日">
+        <span class="cal-day-num">${day}</span>
+        ${dotsHtml}
+      </div>`;
+    }
+
+    $('cal-grid').innerHTML = html;
+
+    // セルのクリックイベント
+    $('cal-grid').querySelectorAll('.cal-cell[data-date]').forEach(cell => {
+      const onSelect = () => {
+        const d = cell.dataset.date;
+        calSelectedDate = (calSelectedDate === d) ? null : d;
+        renderCalendar();
+        renderCalDayDetail();
+      };
+      cell.addEventListener('click', onSelect);
+      cell.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); }
+      });
+    });
+
+    // 選択日の詳細描画
+    renderCalDayDetail();
+  }
+
+  function renderCalDayDetail() {
+    const detail = $('cal-day-detail');
+    const today = todayStr();
+    const dateMap = buildDateMap();
+
+    if (!calSelectedDate || !dateMap[calSelectedDate]) {
+      detail.classList.add('hidden');
+      return;
+    }
+
+    const list = dateMap[calSelectedDate];
+    const [y, m, d] = calSelectedDate.split('-');
+    const isOverdue = calSelectedDate < today;
+    const label = isOverdue
+      ? `${y}年${Number(m)}月${Number(d)}日（期限超過・${list.length}問）`
+      : calSelectedDate === today
+        ? `${y}年${Number(m)}月${Number(d)}日・今日（${list.length}問）`
+        : `${y}年${Number(m)}月${Number(d)}日（${list.length}問）`;
+
+    $('cal-day-detail-title').textContent = label;
+
+    // 参考書でグループ化して表示
+    const groups = {};
+    list.forEach(p => {
+      const key = `${p.subject || ''}__${p.book || ''}`;
+      if (!groups[key]) groups[key] = { subject: p.subject || '', book: p.book || '', list: [] };
+      groups[key].list.push(p);
+    });
+    let html = '';
+    let gIdx = 0;
+    Object.values(groups).forEach(g => {
+      if (g.list.length === 1) {
+        html += problemRowHtml(g.list[0]);
+      } else {
+        html += bookGroupCardHtml(g.subject, g.book, g.list, `cal-${gIdx++}`);
+      }
+    });
+
+    const container = $('cal-day-list');
+    container.innerHTML = html;
+    detail.classList.remove('hidden');
+    bindGroupToggle(container);
+    bindProblemEvents(container);
+  }
+
+  function renderBookSelect() {
+    const sel = $('in-book-select');
+    const previous = sel.value;
+    const registered = books.slice().sort((a,b) => ((a.subject||'')+(a.name||'')).localeCompare((b.subject||'')+(b.name||''), 'ja'))
+      .map(b => {
+        const title = (b.subject ? `${b.subject} - ` : '') + (b.name || '（名称未設定）');
+        return `<option value="${escapeHtml(b.id)}">${escapeHtml(title)}</option>`;
+      }).join('');
+    sel.innerHTML = registered + '<option value="__custom__">＋ 自由に入力 / 未指定</option>';
+    if (previous && (books.some(b => b.id === previous) || previous === '__custom__')) {
+      sel.value = previous;
+    } else {
+      sel.value = books.length ? books.slice().sort((a,b) => ((a.subject||'')+(a.name||'')).localeCompare((b.subject||'')+(b.name||''), 'ja'))[0].id : '__custom__';
+    }
+    $('no-book-hint').textContent = books.length === 0 ? '参考書を登録するか、「自由に入力 / 未指定」で登録できます。' : '';
+    toggleCustomFields();
+  }
+
+  function toggleCustomFields() {
+    $('custom-book-fields').classList.toggle('hidden', $('in-book-select').value !== '__custom__');
+  }
+
+  function renderBookListView() {
+    const view = $('book-list-view');
+    if (books.length === 0) {
+      view.innerHTML = '<p class="empty">まだ参考書が登録されていません。</p>';
+      return;
+    }
+    view.innerHTML = books.slice().sort((a,b) => ((a.subject||'')+(a.name||'')).localeCompare((b.subject||'')+(b.name||''), 'ja')).map(b => {
+      const title = (b.subject ? `${b.subject} - ` : '') + (b.name || '（名称未設定）');
+      return `<div class="book-row"><span>${escapeHtml(title)}</span><button class="danger book-del-btn" data-id="${escapeHtml(b.id)}" aria-label="${escapeHtml(title)}を削除">削除</button></div>`;
+    }).join('');
+    view.querySelectorAll('.book-del-btn').forEach(btn => btn.addEventListener('click', () => {
+      const target = books.find(b => b.id === btn.dataset.id);
+      const title = target ? ((target.subject ? `${target.subject} - ` : '') + (target.name || '名称未設定')) : '';
+      if (!target || !confirm(`「${title}」を参考書一覧から削除しますか？\n登録済みの問題は削除されません。`)) return;
+      books = books.filter(b => b.id !== btn.dataset.id);
+      if (saveBooks()) { renderBookListView(); renderBookSelect(); renderDatalists(); }
+    }));
+  }
+
+  /** 個々の問題行HTML */
+  function problemRowHtml(p) {
+    const due = p.nextReviewDate || todayStr();
+    const overdue = due < todayStr();
+    const history = Array.isArray(p.history) ? p.history : [];
+    const count = history.length;
+    const historyStr = count > 0 ? history.join(', ') : 'なし';
+    const title = formatTitle(p.subject, p.book);
+    return `<div class="problem-row">
+      <div class="problem-main">
+        <p class="problem-name">${escapeHtml(title)}</p>
+        ${p.page ? `<p class="problem-page">${escapeHtml(p.page)}</p>` : ''}
+        <div class="review-info">
+          <span class="review-badge">復習回数: ${count}回</span>
+          <span>履歴: ${escapeHtml(historyStr)}</span>
+        </div>
+      </div>
+      <div class="problem-tools">
+        <button class="primary review-done-btn" data-id="${escapeHtml(p.id)}">✓ 復習完了</button>
+        <span class="due-date ${overdue ? 'overdue' : ''}">${escapeHtml(due)}</span>
+        <input type="date" value="${escapeHtml(due)}" data-id="${escapeHtml(p.id)}" class="date-edit" aria-label="復習日を変更">
+        <button data-id="${escapeHtml(p.id)}" class="archive-btn" title="この問題を履歴へ移動">📦 履歴へ</button>
+        <button data-id="${escapeHtml(p.id)}" class="danger del-btn">削除</button>
+      </div>
+    </div>`;
+  }
+
+  /** グループ内の問題行HTML */
+  function problemRowInGroupHtml(p) {
+    const due = p.nextReviewDate || todayStr();
+    const overdue = due < todayStr();
+    const history = Array.isArray(p.history) ? p.history : [];
+    const count = history.length;
+    const historyStr = count > 0 ? history.join(', ') : 'なし';
+    return `<div class="problem-row">
+      <div class="problem-main">
+        ${p.page ? `<p class="problem-name">${escapeHtml(p.page)}</p>` : '<p class="problem-name">問題（ページ指定なし）</p>'}
+        <div class="review-info">
+          <span class="review-badge">復習回数: ${count}回</span>
+          <span>履歴: ${escapeHtml(historyStr)}</span>
+        </div>
+      </div>
+      <div class="problem-tools">
+        <button class="primary review-done-btn" data-id="${escapeHtml(p.id)}">✓ 復習完了</button>
+        <span class="due-date ${overdue ? 'overdue' : ''}">${escapeHtml(due)}</span>
+        <input type="date" value="${escapeHtml(due)}" data-id="${escapeHtml(p.id)}" class="date-edit" aria-label="復習日を変更">
+        <button data-id="${escapeHtml(p.id)}" class="archive-btn" title="この問題を履歴へ移動">📦 履歴へ</button>
+        <button data-id="${escapeHtml(p.id)}" class="danger del-btn">削除</button>
+      </div>
+    </div>`;
+  }
+
+  /** アーカイブ済み問題の行HTML */
+  function archivedRowHtml(p) {
+    const title = formatTitle(p.subject, p.book);
+    const history = Array.isArray(p.history) ? p.history : [];
+    const count = history.length;
+    const archivedAt = p.archivedAt || '';
+    return `<div class="archived-row">
+      <div class="archived-main">
+        <p class="archived-name">📦 ${escapeHtml(title)}${p.page ? ' — ' + escapeHtml(p.page) : ''}</p>
+        <p class="archived-meta">復習回数: ${count}回${archivedAt ? ' · 履歴追加日: ' + escapeHtml(archivedAt) : ''}</p>
+      </div>
+      <div class="archived-tools">
+        <button class="restore-btn" data-id="${escapeHtml(p.id)}">↩ 復元</button>
+        <button class="danger del-btn" data-id="${escapeHtml(p.id)}">削除</button>
+      </div>
+    </div>`;
+  }
+
+  /** 参考書グループカードHTML */
+  function bookGroupCardHtml(subject, book, list, groupId) {
+    const today = todayStr();
+    const overdueCount = list.filter(p => (p.nextReviewDate || '') < today).length;
+    const metaText = `${list.length}問` + (overdueCount > 0 ? ` / 期限超過 ${overdueCount}問` : '');
+    const title = formatTitle(subject, book);
+    const innerRows = list
+      .sort((a,b) => (a.nextReviewDate||'').localeCompare(b.nextReviewDate||''))
+      .map(problemRowInGroupHtml).join('');
+    return `<div class="book-group-card" id="group-${escapeHtml(groupId)}">
+      <div class="book-group-header" data-group="${escapeHtml(groupId)}" role="button" aria-expanded="false" tabindex="0">
+        <div class="book-group-title">📖 ${escapeHtml(title)}</div>
+        <span class="book-group-meta">${escapeHtml(metaText)}</span>
+        <span class="book-group-toggle">▼</span>
+      </div>
+      <div class="book-group-body">${innerRows}</div>
+    </div>`;
+  }
+
+  function renderDatalists() {
+    const subjects = [...new Set([...books.map(b=>b.subject), ...problems.map(p=>p.subject)].filter(Boolean))];
+    const names = [...new Set([...books.map(b=>b.name), ...problems.map(p=>p.book)].filter(Boolean))];
+    $('subject-list').innerHTML = subjects.map(s => `<option value="${escapeHtml(s)}"></option>`).join('');
+    $('book-name-list').innerHTML = names.map(s => `<option value="${escapeHtml(s)}"></option>`).join('');
+  }
+
+  function bindGroupToggle(container) {
+    container.querySelectorAll('.book-group-header').forEach(header => {
+      const toggle = () => {
+        const groupId = header.dataset.group;
+        const card = document.getElementById(`group-${groupId}`);
+        const isOpen = card.classList.toggle('open');
+        header.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      };
+      header.addEventListener('click', toggle);
+      header.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+      });
+    });
+  }
+
+  function bindProblemEvents(container) {
+    container.querySelectorAll('.del-btn').forEach(btn => btn.addEventListener('click', () => {
+      const p = problems.find(p => p.id === btn.dataset.id);
+      if (!p || !confirm('この問題を削除しますか？')) return;
+      problems = problems.filter(p => p.id !== btn.dataset.id);
+      if (saveProblems()) render();
+    }));
+    container.querySelectorAll('.date-edit').forEach(inp => inp.addEventListener('change', () => {
+      const p = problems.find(p => p.id === inp.dataset.id);
+      if (!p || !inp.value) return;
+      p.nextReviewDate = inp.value;
+      if (saveProblems()) render();
+    }));
+    container.querySelectorAll('.review-done-btn').forEach(btn => btn.addEventListener('click', () => {
+      const p = problems.find(p => p.id === btn.dataset.id);
+      if (!p) return;
+      if (!Array.isArray(p.history)) p.history = [];
+      p.history.push(todayStr());
+      if (saveProblems()) render();
+    }));
+    container.querySelectorAll('.archive-btn').forEach(btn => btn.addEventListener('click', () => {
+      const p = problems.find(p => p.id === btn.dataset.id);
+      if (!p) return;
+      p.archived = true;
+      p.archivedAt = todayStr();
+      if (saveProblems()) render();
+    }));
+    container.querySelectorAll('.restore-btn').forEach(btn => btn.addEventListener('click', () => {
+      const p = problems.find(p => p.id === btn.dataset.id);
+      if (!p) return;
+      p.archived = false;
+      p.archivedAt = '';
+      if (saveProblems()) render();
+    }));
+  }
+
+  function render() {
+    renderDatalists();
+    renderBookSelect();
+    renderBookListView();
+    const today = todayStr();
+
+    // カレンダーが表示中なら再描画
+    if (!$('cal-panel').classList.contains('hidden')) {
+      renderCalendar();
+    }
+
+    // ── 今日復習する問題（アーカイブ済みを除外） ──
+    const todays = problems.filter(p => !p.archived && (p.nextReviewDate || '') <= today)
+      .sort((a,b) => (a.nextReviewDate || '').localeCompare(b.nextReviewDate || ''));
+    const todayContainer = $('today-list');
+    if (todays.length === 0) {
+      todayContainer.innerHTML = '<p class="empty">今日復習する問題はありません。</p>';
+    } else {
+      const groups = {};
+      todays.forEach(p => {
+        const key = `${p.subject || ''}__${p.book || ''}`;
+        if (!groups[key]) groups[key] = { subject: p.subject || '', book: p.book || '', list: [] };
+        groups[key].list.push(p);
+      });
+      let html = '';
+      let gIdx = 0;
+      Object.values(groups).forEach(g => {
+        if (g.list.length === 1) {
+          html += problemRowHtml(g.list[0]);
+        } else {
+          html += bookGroupCardHtml(g.subject, g.book, g.list, `today-${gIdx++}`);
+        }
+      });
+      todayContainer.innerHTML = html;
+      bindGroupToggle(todayContainer);
+      bindProblemEvents(todayContainer);
+    }
+
+    // ── 登録済みの問題（アーカイブ済みを除外） ──
+    const activeProblems = problems.filter(p => !p.archived);
+    const allContainer = $('all-list');
+    if (!activeProblems.length) {
+      allContainer.innerHTML = '<p class="empty">まだ問題が登録されていません。</p>';
+    } else {
+      const grouped = {};
+      activeProblems.forEach(p => {
+        const subject = p.subject || '（科目未設定）';
+        const book = p.book || '（参考書未指定）';
+        if (!grouped[subject]) grouped[subject] = {};
+        if (!grouped[subject][book]) grouped[subject][book] = [];
+        grouped[subject][book].push(p);
+      });
+      let html = '';
+      let gIdx = 0;
+      Object.keys(grouped).sort((a,b) => a.localeCompare(b,'ja')).forEach(subject => {
+        html += `<h3 class="subject-heading">${escapeHtml(subject)}</h3>`;
+        Object.keys(grouped[subject]).sort((a,b) => a.localeCompare(b,'ja')).forEach(book => {
+          const list = grouped[subject][book];
+          if (list.length === 1) {
+            html += problemRowHtml(list[0]);
+          } else {
+            html += bookGroupCardHtml(
+              subject === '（科目未設定）' ? '' : subject,
+              book === '（参考書未指定）' ? '' : book,
+              list,
+              `all-${gIdx++}`
+            );
+          }
+        });
+      });
+      allContainer.innerHTML = html;
+      bindGroupToggle(allContainer);
+      bindProblemEvents(allContainer);
+    }
+
+    // ── 履歴（アーカイブ済み）セクション ──
+    const archived = problems.filter(p => p.archived)
+      .sort((a,b) => (b.archivedAt || '').localeCompare(a.archivedAt || ''));
+    const archiveBody = $('archive-body');
+    const archiveBadge = $('archive-count-badge');
+    archiveBadge.textContent = archived.length > 0 ? `（${archived.length}件）` : '';
+    if (archived.length === 0) {
+      archiveBody.innerHTML = '<p class="empty" style="padding:4px 0">履歴に追加された問題はありません。</p>';
+    } else {
+      archiveBody.innerHTML = archived.map(archivedRowHtml).join('');
+      bindProblemEvents(archiveBody);
+    }
+  }
+
+  // ── 初期化 ──
+  $('today-label').textContent = `今日：${todayStr()}`;
+  problems = readStored(STORAGE_PROBLEMS);
+  books = readStored(STORAGE_BOOKS);
+  render();
+
+  // ── 履歴セクションの開閉 ──
+  const archiveToggle = $('archive-toggle');
+  const archiveSection = $('archive-section');
+  const onArchiveToggle = () => {
+    const isOpen = archiveSection.classList.toggle('open');
+    archiveToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  };
+  archiveToggle.addEventListener('click', onArchiveToggle);
+  archiveToggle.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onArchiveToggle(); }
+  });
+
+  // ── ヘッダーボタン ──
+  $('cal-btn').addEventListener('click', () => {
+    const isHidden = $('cal-panel').classList.contains('hidden');
+    if (isHidden) {
+      showPanel('cal');
+      calYear = new Date().getFullYear();
+      calMonth = new Date().getMonth();
+      calSelectedDate = null;
+      renderCalendar();
+    } else {
+      showPanel(null);
+    }
+  });
+  $('book-manage-btn').addEventListener('click', () => { showPanel('books'); renderBookListView(); });
+  $('book-panel-close-btn').addEventListener('click', () => showPanel(null));
+  $('add-open-btn').addEventListener('click', () => {
+    showPanel('add');
+    $('in-date').value = todayStr();
+    $('in-date-picker').value = todayStr();
+    renderBookSelect();
+  });
+  $('add-cancel-btn').addEventListener('click', () => showPanel(null));
+  $('in-book-select').addEventListener('change', toggleCustomFields);
+
+  // ── カレンダーナビ ──
+  $('cal-prev').addEventListener('click', () => {
+    calMonth--;
+    if (calMonth < 0) { calMonth = 11; calYear--; }
+    calSelectedDate = null;
+    renderCalendar();
+  });
+  $('cal-next').addEventListener('click', () => {
+    calMonth++;
+    if (calMonth > 11) { calMonth = 0; calYear++; }
+    calSelectedDate = null;
+    renderCalendar();
+  });
+
+  // ── 問題登録フォーム内のカレンダーピッカー ──
+  $('in-date-picker').addEventListener('click', () => {
+    if (typeof $('in-date-picker').showPicker === 'function') {
+      try { $('in-date-picker').showPicker(); } catch(e) {}
+    }
+  });
+  $('in-date-picker').addEventListener('change', () => {
+    if ($('in-date-picker').value) {
+      $('in-date').value = $('in-date-picker').value;
+    }
+  });
+  $('in-date').addEventListener('input', () => {
+    const normalized = normalizeDateInput($('in-date').value);
+    if (normalized) $('in-date-picker').value = normalized;
+  });
+  $('in-date').addEventListener('change', () => {
+    const normalized = normalizeDateInput($('in-date').value);
+    if (normalized) {
+      $('in-date').value = normalized;
+      $('in-date-picker').value = normalized;
+    }
+  });
+
+  // ── 参考書の追加 ──
+  $('book-add-btn').addEventListener('click', () => {
+    const subject = $('book-in-subject').value.trim();
+    let name = $('book-in-name').value.trim();
+    if (!name && !subject) {
+      alert('科目または参考書名のどちらかを入力してください。');
+      return;
+    }
+    if (!name) name = '（名称未設定）';
+    books.push({ id: makeId(), subject, name });
+    if (saveBooks()) {
+      $('book-in-subject').value = '';
+      $('book-in-name').value = '';
+      renderBookListView();
+      renderBookSelect();
+      renderDatalists();
+    } else books.pop();
+  });
+
+  // ── 問題の登録 ──
+  $('add-save-btn').addEventListener('click', () => {
+    const bookId = $('in-book-select').value;
+    const page = $('in-page').value.trim();
+    let subject = '', book = '';
+
+    if (bookId === '__custom__') {
+      subject = $('in-subject').value.trim();
+      book = $('in-book').value.trim();
+    } else {
+      const found = books.find(b => b.id === bookId);
+      if (found) {
+        subject = found.subject || '';
+        book = found.name || '';
+      }
+    }
+
+    const normalizedDate = normalizeDateInput($('in-date').value);
+    if (!normalizedDate) {
+      alert('復習日は「2026-10-20」のように入力するか、カレンダーから選んでください。');
+      return;
+    }
+
+    const newProblem = { id: makeId(), subject, book, page, nextReviewDate: normalizedDate, history: [] };
+    problems.push(newProblem);
+    if (!saveProblems()) { problems.pop(); return; }
+
+    $('in-page').value = '';
+    $('in-subject').value = '';
+    $('in-book').value = '';
+    showPanel(null);
+    render();
+  });
+})();
+</script>
+</body>
+</html>
